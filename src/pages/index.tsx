@@ -1,18 +1,24 @@
-// pages/index.js
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Head from 'next/head';
+import { useRouter } from 'next/router'; // Importa o hook useRouter para redirecionamento
 
 export default function Home() {
   const [isHoverAvaliacoes, setHoverAvaliacoes] = useState(false);
   const [isHoverLogin, setHoverLogin] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false); // Estado para exibir o modal de login
+  const router = useRouter(); // Instancia o hook useRouter
 
   const handleSearch = (e) => {
     if (e.key === 'Enter') {
       console.log("Pesquisar:", searchQuery);
     }
+  };
+
+  const handleLoginRedirect = () => {
+    // Função para redirecionar para a página de gerenciamento após o login
+    router.push('/gerenciamento'); 
   };
 
   return (
@@ -92,37 +98,42 @@ export default function Home() {
       </section>
 
       {/* Modal de Login */}
-      {showModal && (
-        <div style={modalOverlayStyle}>
-          <div style={blurredBackgroundStyle}></div> {/* Fundo desfocado */}
-          <div style={modalLoginContentStyle}>
-            <button 
-              style={closeButtonStyle} 
-              onClick={() => setShowModal(false)}
-              onMouseEnter={(e) => e.target.style.color = 'red'}
-              onMouseLeave={(e) => e.target.style.color = '#fff'}
-            >
-              X
-            </button>
-            <h2 style={loginTitleStyle}>Faça login</h2>
-            <input 
-              type="text" 
-              placeholder="Usuário" 
-              style={loginInputStyle} 
-              className="login-input"
-            />
-            <input 
-              type="password" 
-              placeholder="Senha" 
-              style={loginInputStyle} 
-              className="login-input"
-            />
-            <button style={loginIconButtonStyle} className="login-icon-button">
-              <img src="/icons/login-icon.png" alt="Entrar" style={loginIconStyle} />
-            </button>
-          </div>
-        </div>
-      )}
+{showModal && (
+  <div style={modalOverlayStyle}>
+    <div style={blurredBackgroundStyle}></div> {/* Fundo desfocado */}
+    <div style={modalLoginContentStyle}>
+      <button 
+        style={closeButtonStyle} 
+        onClick={() => setShowModal(false)}
+        onMouseEnter={(e) => e.target.style.color = 'red'}
+        onMouseLeave={(e) => e.target.style.color = '#fff'}
+      >
+        X
+      </button>
+      <h2 style={loginTitleStyle}>Faça login</h2>
+      <input 
+        type="text" 
+        placeholder="Usuário" 
+        style={loginInputStyle} 
+        className="login-input"
+      />
+      <input 
+        type="password" 
+        placeholder="Senha" 
+        style={loginInputStyle} 
+        className="login-input"
+      />
+      <button 
+        style={loginIconButtonStyle} 
+        className="login-icon-button"
+        onClick={handleLoginRedirect} // Função de redirecionamento chamada ao clicar no botão
+      >
+        <img src="/icons/login-icon.png" alt="Entrar" style={loginIconStyle} />
+      </button>
+    </div>
+  </div>
+)}
+
 
       <style jsx>{`
         /* Efeito bolha na barra de pesquisa */
