@@ -3,20 +3,25 @@ import Head from 'next/head';
 import axios from 'axios';
 import { useRouter } from 'next/router';
 
-type Usuario = {
-  user_id: number;
-  display_name: string;
+type Livro = {
+  id: number;
+  title_id: number;
+  name: string;
 };
 
-export default function GerenciamentoUsuario() {
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+export default function GerenciamentoLivro() {
+  const [livros, setLivros] = useState<Livro[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [token, setToken] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<number | null>(null);
+  const [bookToDelete, setBookToDelete] = useState<number | null>(null);
   const router = useRouter();
-
-  const apiUrl = 'http://127.0.0.1:8000/users';
+  
+  const apiUrl = 'http://127.0.0.1:8000/titles';
+  const limit = 100;
 
   useEffect(() => {
     const obterToken = async () => {
@@ -28,69 +33,95 @@ export default function GerenciamentoUsuario() {
 
         if (response.status === 200 && response.data.token) {
           setToken(response.data.token);
-          if (searchQuery) {
-            buscarUsuarios();
-          }
         }
       } catch (error) {
         console.error('Erro ao obter o token:', error);
       }
     };
-
     obterToken();
-  }, [searchQuery]);
+  }, []);
 
-  const buscarUsuarios = async () => {
+  useEffect(() => {
+    if (token && searchQuery) {
+      carregarLivros();
+    }
+  }, [token, searchQuery, page]);
+
+  const carregarLivros = async () => {
+    setIsLoading(true);
     try {
-      const params = { display_name: searchQuery, page: 1, limit: 20 };
       const response = await axios.get(apiUrl, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-        params: params,
+        params: {
+          name: searchQuery,
+          page: page,
+          limit: limit,
+        },
       });
 
       if (response.status === 200) {
-        setUsuarios(response.data.data);
+        setLivros(response.data.data);
+        setTotalPages(response.data.total_pages);
       }
     } catch (error) {
-      console.error('Erro ao buscar usuários:', error);
+      console.error('Erro ao carregar livros:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleEdit = (user_id: number) => {
-    router.push(`/editarusuario/${user_id}`);
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    setPage(1);
   };
 
-  const handleDelete = (user_id: number) => {
-    setUserToDelete(user_id);
+  // Corrigindo a função handleEdit para passar corretamente o title_id
+  const handleEdit = (title_id: number) => {
+    router.push(`/editarlivro?title_id=${title_id}`);
+  };
+
+  const handleDelete = (id: number) => {
+    setBookToDelete(id);
     setShowDeleteConfirm(true);
   };
 
   const confirmDelete = async () => {
-    if (userToDelete === null) return;
+    if (bookToDelete === null) return;
 
     try {
-      await axios.delete(`${apiUrl}/${userToDelete}`, {
+      await axios.delete(`${apiUrl}/${bookToDelete}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      // Atualiza a lista de usuários e fecha o modal após exclusão
-      setUsuarios(usuarios.filter((usuario) => usuario.user_id !== userToDelete));
+      setLivros(livros.filter((livro) => livro.id !== bookToDelete));
     } catch (error) {
-      console.error('Erro ao excluir usuário:', error);
+      console.error('Erro ao excluir livro:', error);
     } finally {
-      setShowDeleteConfirm(false);  // Fecha o modal sempre, mesmo se houver erro
-      setUserToDelete(null);
+      setShowDeleteConfirm(false);
+      setBookToDelete(null);
     }
   };
+
+  const loadMoreBooks = () => {
+    if (!isLoading && page < totalPages) {
+      setPage(prevPage => prevPage + 1);
+    }
+  };
+
+  useEffect(() => {
+    if (page > 1 && searchQuery) {
+      carregarLivros();
+    }
+  }, [page]);
 
   return (
     <div style={containerStyle}>
       <Head>
-        <title>Gerenciamento de Usuários</title>
+        <title>Gerenciamento de Livros</title>
       </Head>
 
       <header style={headerStyle}>
@@ -98,42 +129,45 @@ export default function GerenciamentoUsuario() {
           <img src="/icons/search-icon.png" alt="Pesquisar" style={searchIconStyle} />
           <input
             type="text"
-            placeholder="Pesquisar usuários"
-            style={{ ...searchInputStyle, color: '#555' }}
+            placeholder="Pesquisar livros"
+            style={searchInputStyle}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && searchQuery && buscarUsuarios()}
+            onChange={handleSearchChange}
           />
         </div>
-        <button style={createUserButtonStyle} onClick={() => router.push('/criarusuario')}>
-          Criar usuário
+        <button style={createBookButtonStyle} onClick={() => router.push('/criarlivro')}>
+          Criar livro
         </button>
       </header>
 
       <main style={mainContentStyle}>
-        <ul style={userListStyle}>
-          {usuarios.length > 0 ? (
-            usuarios.map((usuario) => (
-              <li key={usuario.user_id} style={userItemStyle}>
-                <span style={userNameStyle}>{usuario.display_name || 'Nome não disponível'}</span>
+        <ul style={bookListStyle}>
+          {livros.length > 0 ? (
+            livros.map((livro) => (
+              <li key={livro.id} style={bookItemStyle}>
+                <span style={bookTitleStyle}>{livro.name}</span>
                 <div>
-                  <button style={editButtonStyle} onClick={() => handleEdit(usuario.user_id)}>
+                  {/* Usando title_id corretamente no botão "Editar" */}
+                  <button style={editButtonStyle} onClick={() => handleEdit(livro.title_id)}>
                     Editar
                   </button>
-                  <button style={deleteButtonStyle} onClick={() => handleDelete(usuario.user_id)}>
-                    ✕
+                  <button style={deleteButtonStyle} onClick={() => handleDelete(livro.title_id)}>
+                    Excluir
                   </button>
                 </div>
               </li>
             ))
           ) : (
-            <li style={userItemStyle}>Nenhum usuário encontrado.</li>
+            <li style={bookItemStyle}>Nenhum livro encontrado.</li>
           )}
         </ul>
+
+        {isLoading && <p>Carregando...</p>}
+
         {showDeleteConfirm && (
           <div style={confirmOverlayStyle}>
             <div style={confirmBoxStyle}>
-              <p>Você tem certeza que quer excluir o usuário?</p>
+              <p>Você tem certeza que quer excluir o livro?</p>
               <button style={confirmButtonStyle} onClick={confirmDelete}>
                 Sim
               </button>
@@ -144,9 +178,12 @@ export default function GerenciamentoUsuario() {
           </div>
         )}
       </main>
+
+      <div style={{ height: '20px', background: '#f1f1f1' }} onClick={loadMoreBooks}></div>
     </div>
   );
 }
+
 
 // Estilos
 
@@ -191,7 +228,7 @@ const searchInputStyle = {
   color: '#000',
 };
 
-const createUserButtonStyle = {
+const createBookButtonStyle = {
   backgroundColor: '#0055cc',
   color: 'white',
   padding: '10px 20px',
@@ -207,12 +244,12 @@ const mainContentStyle = {
   width: '100%',
 };
 
-const userListStyle = {
+const bookListStyle = {
   listStyleType: 'none',
   padding: 0,
 };
 
-const userItemStyle = {
+const bookItemStyle = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
@@ -221,7 +258,7 @@ const userItemStyle = {
   borderBottom: '1px solid #ccc',
 };
 
-const userNameStyle = {
+const bookTitleStyle = {
   fontSize: '18px',
 };
 
@@ -231,7 +268,6 @@ const editButtonStyle = {
   padding: '10px 15px',
   borderRadius: '5px',
   cursor: 'pointer',
-  marginRight: '5px',
   transition: 'box-shadow 0.3s ease',
 };
 

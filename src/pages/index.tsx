@@ -1,43 +1,111 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Head from 'next/head';
-import { useRouter } from 'next/router'; // Importa o hook useRouter para redirecionamento
+import { useRouter } from 'next/router';
+import axios from 'axios';
 
 export default function Home() {
-  const [isHoverAvaliacoes, setHoverAvaliacoes] = useState(false);
   const [isHoverLogin, setHoverLogin] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showModal, setShowModal] = useState(false); // Estado para exibir o modal de login
-  const router = useRouter(); // Instancia o hook useRouter
+  const [showModal, setShowModal] = useState(false);
+  const [searchResults, setSearchResults] = useState({ authors: [], genres: [], languages: [] });
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [bestRatedBooks, setBestRatedBooks] = useState([]);
+  const [mostReadBooks, setMostReadBooks] = useState([]);
+  
+  const router = useRouter();
 
-  const handleSearch = (e) => {
-    if (e.key === 'Enter') {
-      console.log("Pesquisar:", searchQuery);
+  useEffect(() => {
+    const fetchBestRatedBooks = async () => {
+      try {
+        const response = await axios.get('http://127.0.0.1:8000/titles/bestrated');
+        setBestRatedBooks(response.data);
+      } catch (error) {
+        console.error('Erro ao buscar livros mais avaliados:', error);
+      }
+    };
+
+    const fetchMostReadBooks = async () => {
+      try {
+        const response = await axios.get('http://127.0.0.1:8000/titles/mostread');
+        setMostReadBooks(response.data);
+      } catch (error) {
+        console.error('Erro ao buscar livros mais emprestados:', error);
+      }
+    };
+
+    fetchBestRatedBooks();
+    fetchMostReadBooks();
+  }, []);
+
+  const handleSearch = async (e) => {
+    if (e.key === 'Enter' || e.type === 'click') {
+      try {
+        const params = { name: searchQuery, page: 1, limit: 20 };
+        const [authorsResponse, genresResponse, languagesResponse] = await Promise.all([
+          axios.get('http://127.0.0.1:8000/authors', { params }),
+          axios.get('http://127.0.0.1:8000/genres', { params }),
+          axios.get('http://127.0.0.1:8000/languages', { params }),
+        ]);
+
+        setSearchResults({
+          authors: authorsResponse.data,
+          genres: genresResponse.data,
+          languages: languagesResponse.data,
+        });
+      } catch (error) {
+        console.error('Erro ao realizar a pesquisa:', error);
+      }
     }
   };
 
-  const handleLoginRedirect = () => {
-    // Função para redirecionar para a página de gerenciamento após o login
-    router.push('/gerenciamento'); 
+  const handleLogin = async () => {
+    try {
+      const response = await axios.post('http://127.0.0.1:8000/auth/login', {
+        username,
+        password,
+      });
+  
+      if (response.status === 200 && response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        router.push('/gerenciamento');
+      } else {
+        alert("Login falhou. Verifique suas credenciais.");
+      }
+    } catch (error) {
+      console.error("Erro no login:", error);
+      alert("Erro ao tentar logar. Tente novamente.");
+    }
+  };
+
+  const handleBookClick = (title_id) => {
+    router.push({
+      pathname: '/visualizarlivro',
+      query: { title_id }, // Adiciona title_id como parâmetro na URL
+    });
+  };
+  
+  // Função para limitar o texto
+  const truncateText = (text, maxLength) => {
+    return text.length > maxLength ? text.slice(0, maxLength) + "..." : text;
   };
 
   return (
     <div>
       <Head>
-        {/* Importa a fonte Inter do Google */}
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet" />
       </Head>
 
-      {/* Cabeçalho */}
       <header style={headerStyle}>
         <div style={leftSectionStyle} onClick={() => window.location.reload()}>
           <img src="/icons/book-icon.png" alt="Ícone Biblioteca" style={logoStyle} />
-          
+
           <div style={searchContainerStyle}>
             <img src="/icons/search-icon.png" alt="Lupa" style={searchIconStyle} />
-            <input 
-              type="text" 
-              placeholder="Pesquisar Livros, Gênero, Autor" 
+            <input
+              type="text"
+              placeholder="Pesquisar Livros, Gênero, Autor"
               style={searchBarStyle}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -49,119 +117,122 @@ export default function Home() {
         </div>
 
         <div style={rightSectionStyle}>
-          <Link 
-            href="/avaliacoes" 
-            style={linkStyle} 
-            onMouseEnter={() => setHoverAvaliacoes(true)} 
-            onMouseLeave={() => setHoverAvaliacoes(false)}
-          >
-            <div style={linkContentStyle}>
-              <img src="/icons/star-icon.png" alt="Avaliações" style={starIconStyle} />
-              Avaliações
-            </div>
-            {isHoverAvaliacoes && <div style={hoverStyle}></div>}
-          </Link>
-          <div 
-            style={linkStyle} 
-            onMouseEnter={() => setHoverLogin(true)} 
+          <div
+            style={linkStyle}
+            onMouseEnter={() => setHoverLogin(true)}
             onMouseLeave={() => setHoverLogin(false)}
-            onClick={() => setShowModal(true)} // Ao clicar, abre o modal de login
+            onClick={() => setShowModal(true)}
           >
             Fazer Login
             {isHoverLogin && <div style={hoverStyle}></div>}
           </div>
         </div>
       </header>
-      
-      {/* Seção de Livros Mais Avaliados */}
+
       <section style={sectionStyle}>
-        <h2 style={sectionTitleStyle}>Livros mais avaliados..</h2>
+        <h2 style={sectionTitleStyle}>Livros mais avaliados</h2>
         <div style={gridStyle}>
-          {[...Array(8)].map((_, index) => (
-            <div key={index} style={bookCardStyle} className="book-card">
-              {/* Aqui vão as capas dos livros */}
+          {bestRatedBooks.map((book) => (
+            <div
+              key={book.title_id}
+              style={bookCardStyle}
+              className="book-card"
+              onClick={() => handleBookClick(book.title_id)}
+            >
+              <img 
+                src={book.photo || "https://image.tmdb.org/t/p/original/jqALKeNzesEkxLhrFsTFAKgu9p2.jpg"} 
+                alt={book.name} 
+                style={{ width: '100%', height: '100%', borderRadius: '10px' }} 
+              />
+              <p style={bookNameStyle}>{truncateText(book.name, 20)}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Nova Seção de Livros Mais Emprestados */}
       <section style={sectionStyle}>
-        <h2 style={sectionTitleStyle}>Livros mais emprestados..</h2>
+        <h2 style={sectionTitleStyle}>Livros mais emprestados</h2>
         <div style={gridStyle}>
-          {[...Array(8)].map((_, index) => (
-            <div key={index} style={bookCardStyle} className="book-card">
-              {/* Aqui vão as capas dos livros */}
+          {mostReadBooks.map((book) => (
+            <div
+              key={book.title_id}
+              style={bookCardStyle}
+              className="book-card"
+              onClick={() => handleBookClick(book.title_id)}
+            >
+              <img 
+                src={book.photo || "https://image.tmdb.org/t/p/original/jqALKeNzesEkxLhrFsTFAKgu9p2.jpg"} 
+                alt={book.name} 
+                style={{ width: '100%', height: '100%', borderRadius: '10px' }} 
+              />
+              <p style={bookNameStyle}>{truncateText(book.name, 20)}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Modal de Login */}
-{showModal && (
-  <div style={modalOverlayStyle}>
-    <div style={blurredBackgroundStyle}></div> {/* Fundo desfocado */}
-    <div style={modalLoginContentStyle}>
-      <button 
-        style={closeButtonStyle} 
-        onClick={() => setShowModal(false)}
-        onMouseEnter={(e) => e.target.style.color = 'red'}
-        onMouseLeave={(e) => e.target.style.color = '#fff'}
-      >
-        X
-      </button>
-      <h2 style={loginTitleStyle}>Faça login</h2>
-      <input 
-        type="text" 
-        placeholder="Usuário" 
-        style={loginInputStyle} 
-        className="login-input"
-      />
-      <input 
-        type="password" 
-        placeholder="Senha" 
-        style={loginInputStyle} 
-        className="login-input"
-      />
-      <button 
-        style={loginIconButtonStyle} 
-        className="login-icon-button"
-        onClick={handleLoginRedirect} // Função de redirecionamento chamada ao clicar no botão
-      >
-        <img src="/icons/login-icon.png" alt="Entrar" style={loginIconStyle} />
-      </button>
-    </div>
-  </div>
-)}
-
+      {showModal && (
+        <div style={modalOverlayStyle}>
+          <div style={blurredBackgroundStyle}></div>
+          <div style={modalLoginContentStyle}>
+            <button
+              style={closeButtonStyle}
+              onClick={() => setShowModal(false)}
+              onMouseEnter={(e) => (e.target.style.color = 'red')}
+              onMouseLeave={(e) => (e.target.style.color = '#fff')}
+            >
+              X
+            </button>
+            <h2 style={loginTitleStyle}>Faça login</h2>
+            <input
+              type="text"
+              placeholder="Usuário"
+              style={loginInputStyle}
+              className="login-input"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+            <input
+              type="password"
+              placeholder="Senha"
+              style={loginInputStyle}
+              className="login-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <button
+              style={loginIconButtonStyle}
+              className="login-icon-button"
+              onClick={handleLogin}
+            >
+              <img src="/icons/login-icon.png" alt="Entrar" style={loginIconStyle} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
-        /* Efeito bolha na barra de pesquisa */
         input[type="text"]:hover {
           transform: scale(1.05);
           transition: transform 0.3s ease-in-out;
         }
 
-        /* Efeito bolha nos links de Login e Avaliações */
         a:hover {
           transform: scale(1.05);
           transition: transform 0.3s ease-in-out;
         }
 
-        /* Efeito bolha nos cartões de livros */
         .book-card:hover {
           transform: translateY(-10px);
           transition: transform 0.3s ease-in-out;
           box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.2);
         }
 
-        /* Efeito bolha nos campos de login (Usuário e Senha) */
         .login-input:hover {
           transform: scale(1.05);
           transition: transform 0.3s ease-in-out;
         }
 
-        /* Efeito bolha no botão de login */
         .login-icon-button:hover {
           transform: scale(1.1);
           transition: transform 0.3s ease-in-out;
@@ -172,6 +243,17 @@ export default function Home() {
 }
 
 /* Estilos do cabeçalho */
+const bookNameStyle = {
+  textAlign: 'center',
+  marginTop: '10px',
+  fontWeight: 'bold',
+  fontSize: '16px',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  width: '100%',
+};
+
 const headerStyle = {
   display: 'flex',
   alignItems: 'center',
@@ -366,6 +448,7 @@ const loginInputStyle = {
   border: '1px solid #ccc',
   width: '100%',
   fontSize: '16px',
+  color: '#000',
 };
 
 const loginIconButtonStyle = {

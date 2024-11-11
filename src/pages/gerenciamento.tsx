@@ -9,6 +9,10 @@ export default function Gerenciamento() {
     router.push('/gerenciamentousuarios');
   };
 
+  const irParaLivros = () => {
+    router.push('/gerenciamentolivros'); // Novo redirecionamento adicionado
+  };
+
   return (
     <div>
       <Head>
@@ -28,7 +32,7 @@ export default function Gerenciamento() {
           <span style={emojiStyle}>👤</span> {/* Emoji genérico de usuário */}
           <p style={menuTextStyle}>Gerenciar Usuário</p>
         </div>
-        <div style={menuItemStyle}>
+        <div style={menuItemStyle} onClick={irParaLivros}> {/* Redirecionamento aqui */}
           <img src="/icons/book-icon.png" alt="Gerenciar Títulos" style={iconStyle} />
           <p style={menuTextStyle}>Gerenciar Títulos</p>
         </div>
